@@ -21,13 +21,20 @@ class FhtMessage:
 
 
 class HttpMessage:
-    """Class for sending info to HTTP server. Also contains enum of errors."""
+    """Class for sending info to HTTP server."""
 
-    OK = 0
-    NEW_ROOM = 1
-    NEW_COMMAND = 2
-
-    def __init__(self, room, error):
+    def __init__(self, room, error, payload):
         """Constructor, initialize instance variables."""
         self.room = room
         self.error = error
+        self.payload = payload
+
+
+class PayloadErrors:
+    """Enum for errors that can happen when interpreting FHT messages."""
+
+    OK = 0
+    NEW_ROOM = 1
+    NEW_TYPE = 2
+    NEW_COMMAND = 4
+    NEW_WARNING = 8

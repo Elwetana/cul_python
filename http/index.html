@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FHT viewer</title>
+    <style type="text/css">
+        div#main {
+            display: flex;
+            flex-wrap: wrap;
+            max-width: 90vw;
+        }
+
+        div.room {
+            min-width: 400px;
+            min-height: 60px;
+            border-color: black;
+            border-style: solid;
+            border-width: 3px;
+            margin: 6px;
+        }
+    </style>
+    <script type="application/javascript">
+        window.addEventListener('DOMContentLoaded', start);
+        
+        async function start() {
+            const response = await fetch('fht_data.json');
+            const jsonData = await response.json();
+            console.log(JSON.stringify(jsonData));
+            /*
+            {
+                "errors":[],
+                "Kotinec":{
+                    "all-valves":[
+                        {"set-valve A":0,"flags":["extended","repetitions"]},
+                        {"set-valve A":0,"flags":["extended","repetitions"]},
+                        {"set-valve A":0,"flags":["extended","repetitions"]},
+                        {"set-valve A":0,"flags":["extended","repetitions"]},
+                        {"set-valve A":0,"flags":["extended","repetitions"]}
+                    ]
+                },
+                "Living room":{
+                    "all-valves":[
+                        {"set-valve":43.13725490196079,"flags":["extended","repetitions"]},
+                        {"set-valve":43.13725490196079,"flags":["extended","repetitions"]},
+                        {"set-valve":43.13725490196079,"flags":["extended","repetitions"]},
+                        {"set-valve":43.13725490196079,"flags":["extended","repetitions"]},
+                        {"set-valve":37.64705882352941,"flags":["extended"]}
+                    ],
+                    "measured-low":[{"special":21.400000000000002,"flags":["extended","bidirectional"]}],
+                    "measured-high":[{"special":0,"flags":["extended","bidirectional"]}],
+                    "warnings":[{"special":"OK","flags":["extended","bidirectional"]}]
+                },...
+            */
+            buildPage(jsonData)
+        }
+
+        async function buildPage(jsonData) {
+            const mainDiv = document.getElementById('main');
+            const roomDiv = mainDiv.childNodes[1]; //the first node is text, this is the first 'real' child
+            const roomHTML = roomDiv.innerHTML;
+            mainDiv.removeChild(roomDiv);
+            let errors = jsonData.errors;
+            delete jsonData.errors;
+            for(let roomName in jsonData) {
+                let room = document.createElement("div");
+                room.className = "room";
+                room.innerHTML = roomHTML;
+                let name = room.getElementsByClassName("room_name")[0];
+                name.innerText = roomName;
+                for(let msgType in jsonData[roomName]) {
+                    let message = room.getElementsByClassName(msgType)[0];
+                    if(message === undefined)
+                        continue;
+                    let s = '';
+                    for(let cmnd of jsonData[roomName][msgType]) {
+                        let flags = cmnd.flags;
+                        delete cmnd.flags;
+                        let cmndName = Object.getOwnPropertyNames(cmnd)[0];
+                        let value = cmnd[cmndName];
+                        if(typeof value == "number") {
+                            value = value.toFixed(1);
+                        }
+                        if(s === '') {
+                            s = cmndName + ":" + value;
+                        }
+                        else {
+                            if(flags.indexOf('repetitions') < 0) {
+                                s += ", " + value;
+                            }
+                        }
+                    }
+                    message.innerText = s;
+                }
+                mainDiv.appendChild(room);
+            }
+            let errorDiv = document.getElementById('errors');
+            errorDiv.innerText = JSON.stringify(errors);
+        }
+    </script>
+</head>
+<body>
+    <div id="main">
+        <div class="room">
+            <p class="room_name"></p>
+            <p class="valves">Setting: <span class="all-valves">no data</span></p>
+            <p class="temp">Low: <span class="measured-low">no data</span></p>
+            <p class="warnings"></p>
+        </div>
+        <div id="errors">
+
+        </div>
+    </div>
+</body>
+</html>

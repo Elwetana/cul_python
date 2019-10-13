@@ -59,17 +59,23 @@ class FhtAnalyzer:
         first and second character. The second character (lower 4 bits) is the
         actual command, the first character (high 4 bits) is set of flags.
         """
+        logger.debug("Analyzing a message")
         msg_type = 'unknown'
         if msg.msg_type in FhtAnalyzer.message_types:
-            msg_type = FhtAnalyzer.commands[msg.msg_type]
+            msg_type = FhtAnalyzer.message_types[msg.msg_type]
         else:
             logger.error("New message type %s", msg.msg_type)
-        value = 0
+        value = 0.0
         if msg_type in FhtAnalyzer.conversions:
             value = FhtAnalyzer.conversions[msg_type](int(msg.value, 16))
         warning = ''
         if msg_type == "warnings":
-            warning = FhtAnalyzer.warnings[int(msg.value, 16)]
+            warningIndex = int(msg.value, 16)
+            if warningIndex < len(FhtAnalyzer.warnings):
+                warning = FhtAnalyzer.warnings[warningIndex]
+            else:
+                warning = 'unknown'
+                logger.error('Unknown warning index: %s', warningIndex)
         command = 'unknown'
         if msg.command[1] in FhtAnalyzer.commands:
             command = FhtAnalyzer.commands[msg.command[1]]
@@ -80,6 +86,7 @@ class FhtAnalyzer:
             f = int(msg.command[0], 16) & (1 << i)
             if f in FhtAnalyzer.flags:
                 flags.append(FhtAnalyzer.flags[f])
+        logger.debug("Analysis complete")
         return {
             'type': msg_type,
             'value': value,
@@ -87,3 +94,7 @@ class FhtAnalyzer:
             'command': command,
             'flags': flags
         }
+
+if __name__ == "__main__":
+    msg = FhtAnalyzer.AnalyzeMessage(FhtMessage("FFFF", "00", "AA", "00"))
+    print(msg)

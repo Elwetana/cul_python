@@ -2,14 +2,15 @@
 """Implementation of the HTTP server."""
 
 import sys
+import logging
+import os.path
+from time import sleep
 from multiprocessing import Queue, Process
 from queue import Empty
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import logging
 from json import dumps
-# from message import HttpMsg
-import time
-from typing import Dict
+from typing import Dict, Any
+from message import HttpMessage
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,9 @@ class HttpHandler(BaseHTTPRequestHandler):
     """Implements the do_GET for handling HTTP requests."""
 
     configRoot = '../http'
-    dataRoot = '../data'
 
-    state: Dict[str, int] = {}
+    MSG_TO_KEEP = 5
+    state: Dict[str, Any] = {'errors': []}
 
     def do_GET(self):
         """
@@ -35,14 +36,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
         if self.path == '/fht_data.json':
             self.wfile.write(bytes(self.get_json(), 'utf-8'))
-            return
-
-        # f = open(HttpHandler.configRoot + 'index.html')
-        # HACK
-        with open('z:\\www\\pustik\\fht_index.html') as f:
-            # /HACK
-            html = f.read()
-        self.wfile.write(bytes(html, 'utf-8'))
+        else:
+            with open(os.path.join(HttpHandler.configRoot, 'index.html')) as f:
+                html = f.read()
+            self.wfile.write(bytes(html, 'utf-8'))
 
     def get_json(self):
         """
@@ -51,17 +48,20 @@ class HttpHandler(BaseHTTPRequestHandler):
         JSON file structure:
         {
             <room_name>: {
-                'last_all': [
-                    {'cmnd': value}, ... # last five messages
+                <msg_type>: [
+                    {<cmnd>: value, 'flags': [...]}, ... # last five messages of this type
                 ],
-
-            }
+                ...
+            },
+            ...
+            'errors': [list of errors]
         }
         """
-        return dumps(self.state)
+        return dumps(HttpHandler.state)
 
 
 class HttpServer(Process):
+    """HTTP Server process, receives messages from dispatcher."""
 
     serverPort = 80
     timeout = 0.1
@@ -91,14 +91,33 @@ class HttpServer(Process):
             while True:
                 self.server.handle_request()
                 try:
-                    msg = self.msg_queue.get(False)
-                    HttpHandler.state += msg['payload']
+                    msg: HttpMessage = self.msg_queue.get(False)
+                    self.update_state(msg)
+                    logger.debug("HTTP message received")
                 except Empty:
                     pass
         except Exception:
             print(sys.exc_info())
 
         logger.warning("HTTP server terminating")
+
+    def update_state(self, msg: HttpMessage):
+        """Update HttpHandler state with values from the message we received."""
+        if msg.room not in HttpHandler.state:
+            HttpHandler.state[msg.room] = {}
+        if msg.payload['type'] not in HttpHandler.state[msg.room]:
+            HttpHandler.state[msg.room][msg.payload['type']] = []
+        if len(HttpHandler.state[msg.room][msg.payload['type']]) >= HttpHandler.MSG_TO_KEEP:
+            del HttpHandler.state[msg.room][msg.payload['type']][0]
+        value = msg.payload['value']
+        if msg.payload['type'] == 'warnings':
+            value = msg.payload['warning']
+        HttpHandler.state[msg.room][msg.payload['type']].append({
+            msg.payload['command']: value,
+            'flags': msg.payload['flags']
+        })
+        if msg.error != 0:
+            HttpHandler.state['errors'].append(msg.error)
 
 
 if __name__ == "__main__":
@@ -108,5 +127,15 @@ if __name__ == "__main__":
     server = HttpServer(msg_queue)
     server.start()
     while True:
-        time.sleep(5)
-        msg_queue.put({'payload': 1})
+        sleep(5)
+        msg_queue.put(HttpMessage(
+            'main room',
+            0,
+            {
+                'type': 'all-valves',
+                'value': 0.0,
+                'warning': '',
+                'command': 'set-valve',
+                'flags': ['extended', 'repetitions']
+            }
+        ))

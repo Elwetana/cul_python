@@ -19,18 +19,14 @@ from multiprocessing import Process, Queue
 from fht_listener import FhtListener
 from fht_analyzer import FhtAnalyzer
 from http_server import HttpServer
-from message import FhtMessage, HttpMessage
+from message import FhtMessage, HttpMessage, PayloadErrors
 
 
 class Dispatcher(Process):
     """The main hub that translates messages from listner to server."""
 
     def __init__(self):
-        """
-        Init the instance variables, read the room ids.
-
-        Read 
-        """
+        """Init the instance variables, read the room ids."""
         Process.__init__(self)
         self.listener_queue = None
         self.http_queue = None
@@ -38,7 +34,7 @@ class Dispatcher(Process):
         idsf = open('../data/known_ids.txt', 'r')
         for l in idsf.readlines():
             if l[0] == '[':
-                cur_room = l[1:-1]
+                cur_room = l[1:-2]
             else:
                 h = '{:02x}'.format(int(l[0:2])) + '{:02x}'.format(int(l[2:4]))
                 self.ids[h.upper()] = cur_room
@@ -59,20 +55,34 @@ class Dispatcher(Process):
 
         while True:
             msg: FhtMessage = self.listener_queue.get()
+            logger.debug("FHT message received")
             # process the message and create a message for http server
-            self.analyze_msg(msg)
+            http_msg = self.analyze_msg(msg)
+            self.http_queue.put(http_msg)
 
     def analyze_msg(self, msg):
         """
         Analyze the FHT message, produce message for HTTP server.
 
-        ???
+        FhtAnalyzer returns a dictionary that we want to send to the HTTP server.
+        We only check it for errors and set the error flags
         """
+        error = PayloadErrors.OK
+        payload = FhtAnalyzer.AnalyzeMessage(msg)
         address = msg.address.upper()
+        room = address
         if address not in self.ids:
-            logger.error("Unknown room %s", msg.address)
-            return HttpMessage(address, HttpMessage.NEW_ROOM)
-        data = FhtAnalyzer.AnalyzeMessage(msg)
+            logger.error("Unknown room %s", address)
+            error |= PayloadErrors.NEW_ROOM
+        else:
+            room = self.ids[address]
+        if payload["type"] == 'unknown':
+            error |= PayloadErrors.NEW_TYPE
+        if payload["command"] == 'unknown':
+            error |= PayloadErrors.NEW_COMMAND
+        if payload["warning"] == 'unknown':
+            error |= PayloadErrors.NEW_WARNING
+        return HttpMessage(room, error, payload)
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s',

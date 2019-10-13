@@ -3,6 +3,7 @@
 
 from multiprocessing import Process, Queue
 import logging
+import datetime
 import RPi.GPIO as GPIO
 import serial
 from message import FhtMessage
@@ -31,7 +32,19 @@ class FhtListener(Process):
         GPIO.output(17, GPIO.HIGH)
 
         self.port = serial.Serial("/dev/ttyAMA0", baudrate=38400, timeout=30.0)
-        self.message_log = open("../data/fth_message_log.txt", "a")
+        self.message_log_name = ""
+        self.message_log = open("../data/fht_message_log.txt", "a")
+        self.message_log.write("Starting the Listener process on %s\n" % datetime.datetime.now().isoformat())
+        self.check_log()
+
+    def check_log(self):
+        """Check and rotate the log."""
+        d = datetime.datetime.now()
+        s = "{:04}{:02}{:02}-{:01}".format(d.year, d.month, d.day, d.hour // 4)
+        if self.message_log_name != s:
+            self.message_log.close()
+            self.message_log_name = s
+            self.message_log = open("../data/fht_message_log%s.txt" % self.message_log_name, "a")
 
     def run(self):
         r"""
@@ -39,7 +52,7 @@ class FhtListener(Process):
 
         Start the main loop. Waith for 30 seconds for message, if message is
         received, check if it has the correct length (i.e. it is terminated
-        by \r\n), and if yes push it into queue
+        by \r\n), and if yes push it into queue.
         """
         logger.warning("FHT listener running")
         self.port.write(b"X01\n")
@@ -48,7 +61,9 @@ class FhtListener(Process):
             if msg:
                 if msg[-1] == 10 and msg[-2] == 13:
                     m = self.parse_message(msg)
+                    self.check_log()
                     m.write(self.message_log)
+                    logger.debug("Listener observed a message")
                     self.msg_queue.put(m)
                 else:
                     logger.error("Non standard length message received %s", msg.decode("ascii"))
