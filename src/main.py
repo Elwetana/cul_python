@@ -19,7 +19,7 @@ from multiprocessing import Process, Queue
 from fht_listener import FhtListener
 from fht_analyzer import FhtAnalyzer
 from http_server import HttpServer
-from message import FhtMessage, HttpMessage, PayloadErrors
+from message import FhtMessage, HttpMessage, PayloadErrors, RoomIds
 
 
 class Dispatcher(Process):
@@ -30,14 +30,7 @@ class Dispatcher(Process):
         Process.__init__(self)
         self.listener_queue = None
         self.http_queue = None
-        self.ids = {}
-        idsf = open('../data/known_ids.txt', 'r')
-        for l in idsf.readlines():
-            if l[0] == '[':
-                cur_room = l[1:-2]
-            else:
-                h = '{:02x}'.format(int(l[0:2])) + '{:02x}'.format(int(l[2:4]))
-                self.ids[h.upper()] = cur_room
+        self.roomIds = RoomIds()
 
     def start(self):
         """
@@ -71,11 +64,11 @@ class Dispatcher(Process):
         payload = FhtAnalyzer.AnalyzeMessage(msg)
         address = msg.address.upper()
         room = address
-        if address not in self.ids:
+        if address not in self.roomIds:
             logger.error("Unknown room %s", address)
             error |= PayloadErrors.NEW_ROOM
         else:
-            room = self.ids[address]
+            room = self.roomIds[address]
         if payload["type"] == 'unknown':
             error |= PayloadErrors.NEW_TYPE
         if payload["command"] == 'unknown':

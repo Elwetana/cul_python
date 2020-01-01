@@ -12,10 +12,55 @@ class FhtAnalyzer:
 
     message_types = {
         "00": "all-valves",
+
+        "14": "mon-from1",
+        "15": "mon-to1",
+        "16": "mon-from2",
+        "17": "mon-to2",
+        "18": "tue-from1",
+        "19": "tue-to1",
+        "1A": "tue-from2",
+        "1B": "tue-to2",
+        "1C": "wed-from1",
+        "1D": "wed-to1",
+        "1E": "wed-from2",
+        "1F": "wed-to2",
+        "20": "thu-from1",
+        "21": "thu-to1",
+        "22": "thu-from2",
+        "23": "thu-to2",
+        "24": "fri-from1",
+        "25": "fri-to1",
+        "26": "fri-from2",
+        "27": "fri-to2",
+        "28": "sat-from1",
+        "29": "sat-to1",
+        "2A": "sat-from2",
+        "2B": "sat-to2",
+        "2C": "sun-from1",
+        "2D": "sun-to1",
+        "2E": "sun-from2",
+        "2F": "sun-to2",
+
+        "3E": "mode",
+
         "41": "desired-temp",
         "42": "measured-low",
         "43": "measured-high",
-        "44": "warnings"
+        "44": "warnings",
+        "60": "year",
+        "61": "month",
+        "62": "day",
+        "63": "hour",
+        "64": "minute",
+
+        "65": "report1",
+        "66": "report2",
+
+        "82": "day-temp",
+        "84": "night-temp",
+        "85": "lowtemp-offset",  # Alarm-Temp.-Differenz
+        "8A": "windowopen-temp",
     }
 
     conversions = {
@@ -64,10 +109,10 @@ class FhtAnalyzer:
         if msg.msg_type in FhtAnalyzer.message_types:
             msg_type = FhtAnalyzer.message_types[msg.msg_type]
         else:
-            logger.error("New message type %s", msg.msg_type)
-        value = 0.0
+            logger.error("New message type %s, cmnd: %s, val: %s", msg.msg_type, msg.command, msg.value)
+        value = int(msg.value, 16)
         if msg_type in FhtAnalyzer.conversions:
-            value = FhtAnalyzer.conversions[msg_type](int(msg.value, 16))
+            value = FhtAnalyzer.conversions[msg_type](value)
         warning = ''
         if msg_type == "warnings":
             warningIndex = int(msg.value, 16)
