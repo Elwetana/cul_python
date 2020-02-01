@@ -50,9 +50,7 @@ class FhtListener(Process):
         r"""
         Inherited from Process.
 
-        Start the main loop. Wait for 30 seconds for message, if message is
-        received, check if it has the correct length (i.e. it is terminated
-        by \r\n), and if yes push it into queue.
+        Start the main loop.
         """
         logger.warning("FHT listener running")
         self.port.write(b"X01\n")
@@ -63,6 +61,8 @@ class FhtListener(Process):
                 msg += b
                 if len(msg) > 1 and  msg[-1] == 10 and msg[-2] == 13:
                     m = self.parse_message(msg)
+                    if m is None:
+                        continue
                     self.check_log()
                     m.write(self.message_log)
                     logger.debug("Listener observed a message: %s", msg.decode("ascii"))
@@ -93,6 +93,7 @@ class FhtListener(Process):
         msg = msg.decode("ascii")[:-2]
         if msg[0] != 'T':
             logger.error("Invalid message received: %s", msg)
+            return None
         return FhtMessage(msg[1:5], msg[5:7], msg[7:9], msg[9:])
 
 
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     print("FHT Listener class")
     logging.basicConfig(level=logging.DEBUG)
     msg_queue = Queue()  # type: Queue
-    listner = FhtListener(msg_queue)
-    listner.start()
+    listener = FhtListener(msg_queue)
+    listener.start()
     while True:
         pass

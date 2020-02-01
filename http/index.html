@@ -17,15 +17,33 @@
             border-style: solid;
             border-width: 3px;
             margin: 6px;
+	    padding: 6px;
+        }
+
+        div.battery {
+            background-color: lightpink;
+        }
+
+	p.room_name {
+            margin: 0px 0px 4px 24px;
+	    font-weight: bold;
+	}
+	p.data {
+            margin: 0;
+        }
+
+        span.warnings {
+            color: red;
+            font-weight: bold;
         }
     </style>
     <script type="application/javascript">
         window.addEventListener('DOMContentLoaded', start);
-        
+
         async function start() {
             const response = await fetch('fht_data.json');
             const jsonData = await response.json();
-            console.log(JSON.stringify(jsonData));
+            //console.log(JSON.stringify(jsonData));
             /*
             {
                 "errors":[],
@@ -67,21 +85,36 @@
                 room.innerHTML = roomHTML;
                 let name = room.getElementsByClassName("room_name")[0];
                 name.innerText = roomName;
+                let latestUpdate = 0;
+                let batteryFlag = 0;  //0 -- no set-valve command, 1 -- set-valve without batt flag, 2 -- set-valve with batt flag
                 for(let msgType in jsonData[roomName]) {
                     let message = room.getElementsByClassName(msgType)[0];
-                    if(message === undefined)
+                    if(message === undefined) {
+                        console.log("Message ignored: " + msgType);
                         continue;
+                    }
                     let s = '';
                     for(let cmnd of jsonData[roomName][msgType]) {
                         let flags = cmnd.flags;
                         delete cmnd.flags;
+                        let t = cmnd.time;
+                        delete cmnd.time;
+                        if (t > latestUpdate) {
+                            latestUpdate = t;
+                        }
                         let cmndName = Object.getOwnPropertyNames(cmnd)[0];
                         let value = cmnd[cmndName];
+                        if(cmndName === 'special' && value === 'OK') { //skip OK warnings
+                            continue;
+                        }
+                        if(cmndName.substr(0, 9) === 'set-valve') { //set battery flag by the latest flag received
+                            batteryFlag = flags.indexOf('batt-allowed') < 0 ? 1 : 2;
+                        }
                         if(typeof value == "number") {
                             value = value.toFixed(1);
                         }
                         if(s === '') {
-                            s = cmndName + ":" + value;
+                            s = value;
                         }
                         else {
                             if(flags.indexOf('repetitions') < 0) {
@@ -91,6 +124,12 @@
                     }
                     message.innerText = s;
                 }
+                let timeDiv = room.getElementsByClassName("last_update")[0];
+                let d = new Date(latestUpdate * 1000);
+                timeDiv.innerText = d.toISOString().slice(0,10) + " " + d.toTimeString().substr(0,8);
+                if(batteryFlag === 2) {
+                    room.className += " battery";
+                }
                 mainDiv.appendChild(room);
             }
             let errorDiv = document.getElementById('errors');
@@ -99,16 +138,17 @@
     </script>
 </head>
 <body>
-    <div id="main">
-        <div class="room">
-            <p class="room_name"></p>
-            <p class="valves">Setting: <span class="all-valves">no data</span></p>
-            <p class="temp">Low: <span class="measured-low">no data</span></p>
-            <p class="warnings"></p>
-        </div>
-        <div id="errors">
-
-        </div>
+  <div id="main">
+    <div class="room">
+      <p class="room_name"></p>
+      <p class="data">Setting: <span class="all-valves">no data</span></p>
+      <p class="data">Low: <span class="measured-low">no data</span></p>
+      <p class="data">Desired: <span class="desired-temp">no data</span></p>
+      <!-- p class="data">High: <span class="measured-high">no data</span></p -->
+      <p class="data">Last update: <span class="last_update">0</span>. <span class="warnings"></span></p>
     </div>
+  </div>
+  <div id="errors">
+  </div>
 </body>
 </html>

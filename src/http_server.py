@@ -4,7 +4,7 @@
 import sys
 import logging
 import os.path
-from time import sleep
+from time import sleep, time
 from multiprocessing import Queue, Process
 from queue import Empty
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -33,6 +33,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         """
         self.send_response(200)
         self.send_header('Content-Type', 'text/html')
+        self.send_header('Cache-Control', 'no-store')
         self.end_headers()
         if self.path == '/fht_data.json':
             self.wfile.write(bytes(self.get_json(), 'utf-8'))
@@ -114,7 +115,8 @@ class HttpServer(Process):
             value = msg.payload['warning']
         HttpHandler.state[msg.room][msg.payload['type']].append({
             msg.payload['command']: value,
-            'flags': msg.payload['flags']
+            'flags': msg.payload['flags'],
+            'time': time()
         })
         if msg.error != 0:
             HttpHandler.state['errors'].append(msg.error)

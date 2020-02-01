@@ -78,11 +78,11 @@ class Dispatcher(Process):
         return HttpMessage(room, error, payload)
 
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s',
-                    filename='../data/main.log', level=logging.WARNING)
 logger = logging.getLogger(__name__)
 if __name__ == "__main__":
     os.chdir(os.path.dirname(__file__))
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s: %(message)s',
+                    filename='../data/main.log', level=logging.INFO)
     logger.error("====================== START ===========================")
     fout = open('../data/stdout.log', 'a')
     ferr = open('../data/stderr.log', 'a')
