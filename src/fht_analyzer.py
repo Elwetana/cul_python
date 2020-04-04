@@ -48,6 +48,7 @@ class FhtAnalyzer:
         "42": "measured-low",
         "43": "measured-high",
         "44": "warnings",
+        "4B": "ack",
         "60": "year",
         "61": "month",
         "62": "day",
@@ -110,7 +111,10 @@ class FhtAnalyzer:
             msg_type = FhtAnalyzer.message_types[msg.msg_type]
         else:
             logger.error("New message type %s, cmnd: %s, val: %s", msg.msg_type, msg.command, msg.value)
-        value = int(msg.value, 16)
+        try:
+            value = int(msg.value, 16)
+        except (ValueError, TypeError):
+            value = 0
         if msg_type in FhtAnalyzer.conversions:
             value = FhtAnalyzer.conversions[msg_type](value)
         warning = ''
@@ -122,7 +126,7 @@ class FhtAnalyzer:
                 warning = 'unknown'
                 logger.error('Unknown warning index: %s', warningIndex)
         command = 'unknown'
-        if msg.command[1] in FhtAnalyzer.commands:
+        if (len(msg.command) > 1) and (msg.command[1] in FhtAnalyzer.commands):
             command = FhtAnalyzer.commands[msg.command[1]]
         else:
             logger.error("Unknown command: %s", msg.command[1])

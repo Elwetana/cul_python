@@ -62,6 +62,7 @@ class FhtListener(Process):
                 if len(msg) > 1 and  msg[-1] == 10 and msg[-2] == 13:
                     m = self.parse_message(msg)
                     if m is None:
+                        msg = b''
                         continue
                     self.check_log()
                     m.write(self.message_log)
